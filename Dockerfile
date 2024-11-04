@@ -74,4 +74,9 @@ COPY . .
 RUN chmod +x build.sh
 RUN ./build.sh
 
+# =========================== FOR DEVELOPMENT PURPOSES ===========================
+RUN apt install gedit -y
+WORKDIR /root/VDO_SLAM
+# ================================================================================
+
 CMD ["/bin/bash"]
