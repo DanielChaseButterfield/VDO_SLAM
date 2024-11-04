@@ -77,6 +77,9 @@ RUN ./build.sh
 # =========================== FOR DEVELOPMENT PURPOSES ===========================
 RUN apt install gedit -y
 WORKDIR /root/VDO_SLAM
+
+# NOTE: Dockerfile will fail to build if "dependencies/g2o/build/" exists. Delete if you 
+# need to remake the image.
 # ================================================================================
 
 CMD ["/bin/bash"]

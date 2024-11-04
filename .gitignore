@@ -201,3 +201,6 @@ dependencies/g2o/build/Makefile
 example/vdo_slam
 track_distribution.txt
 track_distribution_static.txt
+
+# Ignore datasets
+datasets/
