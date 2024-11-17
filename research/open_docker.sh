@@ -1,4 +1,4 @@
-VDO_SLAM_ROOT="/home/dbutterfield3/Desktop/VDO_SLAM"
+VDO_SLAM_ROOT="/home/dbutterfield3/Research/VDO_SLAM"
 
 # Lines 5 & 6 for X-Forwarding - Make sure to run "xhost +local:root" on host computer for this to work
 # Lines 7 to the VDO_SLAM repository so changes update to local computer.
