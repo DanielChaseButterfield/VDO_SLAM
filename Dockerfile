@@ -78,6 +78,9 @@ RUN ./build.sh
 RUN apt install gedit -y
 WORKDIR /root/VDO_SLAM
 
+RUN git config --global user.name "Daniel Butterfield"
+RUN git config --global user.email "danielcbutter@gmail.com"
+
 # NOTE: Dockerfile will fail to build if "dependencies/g2o/build/" exists. Delete if you 
 # need to remake the image.
 # ================================================================================
