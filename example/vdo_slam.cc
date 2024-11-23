@@ -40,13 +40,16 @@ int main(int argc, char **argv)
     vector<string> vstrFilenamesSEM;
     vector<string> vstrFilenamesFLO;
     std::vector<cv::Mat> vPoseGT;
-    vector<vector<float> > vObjPoseGT;
+    vector<vector<float>> vObjPoseGT;
     vector<double> vTimestamps;
 
     LoadData(argv[2], vstrFilenamesSEM, vstrFilenamesRGB, vstrFilenamesDEP, vstrFilenamesFLO,
                   vTimestamps, vPoseGT, vObjPoseGT);
 
-    // save the id of object pose in each frame
+    // Save the indices of object poses that correspond to each frame.
+    // Each inner vector corresponds to a frame, and each int in said
+    // vector is the index of an object pose in vObjPoseGT that 
+    // corresponds.
     vector<vector<int> > vObjPoseID(vstrFilenamesRGB.size());
     for (int i = 0; i < vObjPoseGT.size(); ++i)
     {
@@ -55,7 +58,6 @@ int main(int argc, char **argv)
             break;
         vObjPoseID[f_id].push_back(i);
     }
-
 
     // Check consistency in the number of images, depth maps, segmentations and flow maps
     int nImages = vstrFilenamesRGB.size()-1;
@@ -138,6 +140,8 @@ int main(int argc, char **argv)
         // Pass the image to the SLAM system
         SLAM.TrackRGBD(imRGB,imD_f,imFlow,imSem,mTcw_gt,vObjPose_gt,tframe,imTraj,nImages);
 
+        
+
     }
 
     // Save camera trajectory
@@ -147,6 +151,22 @@ int main(int argc, char **argv)
     return 0;
 }
 
+/**
+ * This function loads data from a dataset sequence, and also gets filenames for it.
+ * 
+ * Parameters:
+ *  strPathToSequence: The path to the dataset folder.
+ *  vstrFilenamesSEM: Initially empty; vector filled with filenames of all semantic label text files.
+ *  vstrFilenamesRGB: Initially empty; vector filled with filenames of all rgb images.
+ *  vstrFilenamesDEP: Initially empty; vector filled with filenames of all depth images.
+ *  vstrFilenamesFLO: Initially empty; vector filled with filenames of all flow files.
+ *  vTimestamps: Initially empty; vector filled with the timestamp values from strPathToSequence/times.txt.
+ *  vPoseGT: Initially empty; vector filled with ground truth pose matricies of the camera/robot.
+ *  vObjPoseGT: Initially empty; vector filled with object poses. Each inner vector corresponds to a single
+ *      object pose, with first number as frame number, second number as semantic label, and the rest as
+ *      information for the pose. The exact meaning depends on the dataset, see Tracking.cc for ObjPoseParsing
+ *      functions.
+ */
 void LoadData(const string &strPathToSequence, vector<string> &vstrFilenamesSEM,
               vector<string> &vstrFilenamesRGB,vector<string> &vstrFilenamesDEP, vector<string> &vstrFilenamesFLO,
               vector<double> &vTimestamps, vector<cv::Mat> &vPoseGT, vector<vector<float> > &vObjPoseGT)

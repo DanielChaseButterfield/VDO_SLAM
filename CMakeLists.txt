@@ -59,6 +59,7 @@ src/Converter.cc
 src/Map.cc
 src/Optimizer.cc
 src/Frame.cc
+src/Exceptions.cc
 
 src/cvplot/color.cc
 src/cvplot/figure.cc

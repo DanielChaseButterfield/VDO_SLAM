@@ -130,6 +130,7 @@ public:
         OMD=1,
         KITTI=2,
         VirtualKITTI=3,
+        S3E_Teaching_Building_1=4,
     };
 
     eDataState mTestData;

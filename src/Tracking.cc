@@ -19,6 +19,7 @@
 #include"Converter.h"
 #include"Map.h"
 #include"Optimizer.h"
+#include"Exceptions.h"
 
 #include<iostream>
 #include<string>
@@ -127,6 +128,9 @@ Tracking::Tracking(System *pSys, Map *pMap, const string &strSettingPath, const 
             mTestData = VirtualKITTI;
             cout << "- tested dataset: Virtual KITTI " << endl;
             break;
+        case 4:
+            mTestData = S3E_Teaching_Building_1;
+            cout << "- tested dataset: S3E_Teaching_Building_1" << endl;
     }
 
     if(sensor==System::STEREO || sensor==System::RGBD)
@@ -161,6 +165,11 @@ Tracking::Tracking(System *pSys, Map *pMap, const string &strSettingPath, const 
         cout << "- used detected feature for background scene..." << endl;
 }
 
+/**
+ * Parameters:
+ *  vObjPose_gt: Contains only the relevant lines of object_pose.txt that pertain to the current frame.
+ *      Thus, only contains ground truth pose of objects viewed in this frame.
+ */
 cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, cv::Mat &imD, const cv::Mat &imFlow,
                                 const cv::Mat &maskSEM, const cv::Mat &mTcw_gt, const vector<vector<float> > &vObjPose_gt,
                                 const double &timestamp, cv::Mat &imTraj, const int &nImage)
@@ -198,6 +207,9 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, cv::Mat &imD, const cv::Ma
                     imD.at<float>(i,j) = mbf/(imD.at<float>(i,j)/mDepthMapFactor);
                     // --- for monocular depth map ---
                     // imD.at<float>(i,j) = imD.at<float>(i,j)/500.0;
+                }
+                else if (mTestData==S3E_Teaching_Building_1) {
+                    throw NotImplementedException("Not Implemented");
                 }
             }
         }
@@ -339,6 +351,8 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, cv::Mat &imD, const cv::Ma
             mCurrentFrame.vObjPose_gt[i] = ObjPoseParsingOX(vObjPose_gt[i]);
         else if (mTestData==KITTI)
             mCurrentFrame.vObjPose_gt[i] = ObjPoseParsingKT(vObjPose_gt[i]);
+        else if (mTestData==S3E_Teaching_Building_1)
+            throw NotImplementedException("Not Implemented");
     }
 
     // Save temperal matches for visualization
@@ -803,6 +817,9 @@ void Tracking::Track()
                         L_w_p = Last_Twc_gt*L_p;
                         // cout << "what is L_w_p: " << endl << L_w_p << endl;
                     }
+                    else if (mTestData==S3E_Teaching_Building_1) {
+                        throw NotImplementedException("Not Implemented");
+                    }
                     bCheckGT1 = true;
                     break;
                 }
@@ -821,6 +838,9 @@ void Tracking::Track()
                         // cout << "what is L_c: " << endl << L_c << endl;
                         L_w_c = Curr_Twc_gt*L_c;
                         // cout << "what is L_w_c: " << endl << L_w_c << endl;
+                    }
+                    else if (mTestData==S3E_Teaching_Building_1) {
+                        throw NotImplementedException("Not Implemented");
                     }
                     mCurrentFrame.vObjBoxID[i] = k;
                     bCheckGT2 = true;
@@ -1206,6 +1226,9 @@ void Tracking::Track()
             // GetVelocityError(mpMap->vmRigidMotion_RF, mpMap->vp3DPointDyn, mpMap->vnFeatLabel,
             //                  mpMap->vnRMLabel, mpMap->vfAllSpeed_GT, mpMap->vnAssoDyn, mpMap->vbObjStat);
         }
+        else if (mTestData==S3E_Teaching_Building_1) {
+            throw NotImplementedException("Not Implemented");
+        }
     }
 
     mState = OK;
@@ -1405,7 +1428,10 @@ std::vector<std::vector<int> > Tracking::DynObjTracking()
     {
         shrin_thr_row = 25;
         shrin_thr_col = 50;
+    } else if (mTestData==S3E_Teaching_Building_1) {
+        throw NotImplementedException("Not Implemented");
     }
+
     for (int i = 0; i < Posi.size(); ++i)
     {
         // shrink the image to get rid of object parts on the boundary
@@ -3786,7 +3812,4 @@ void Tracking::GetVelocityError(const std::vector<std::vector<cv::Mat> > &RigMot
 
 }
 
-// ---------------------------------------------------------------------------------------
-// ---------------------------------------------------------------------------------------
-
-} //namespace VDO_SLAM
+}
