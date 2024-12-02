@@ -219,12 +219,16 @@ protected:
 
     //Calibration matrix
     cv::Mat mK;
+
+    // Distortion Coefficient Vector
     cv::Mat mDistCoef;
+
+    // Stereo baseline times fx
     float mbf;
 
-    // Threshold close/far points
-    // Points seen as close by the stereo/RGBD sensor are considered reliable
-    float mThDepth;
+    // Threshold close/far points. Points seen as close 
+    // by the stereo/RGBD sensor are considered reliable
+    float mThDepth; // Points further than this for background not considered.
     float mThDepthObj;
 
     // The depth map scale factor.

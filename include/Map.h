@@ -37,7 +37,11 @@ public:
     std::vector<std::vector<cv::Mat> > vp3DPointSta;
     // index of temporal matching. (k-1)*n
     std::vector<std::vector<int> > vnAssoSta;
-    // feature tracklets: pair.first = frameID; pair.second = featureID;
+
+    // Tracks when a feature is consistently detected across frames
+    // Thus, first vector holds each consistent feature, next vector
+    // holds all of its appearances, and the pair holds the FrameID
+    // in spot 1 and the FeatureID in spot 2.
     std::vector<std::vector<std::pair<int, int> > > TrackletSta;
 
 
@@ -49,7 +53,7 @@ public:
     std::vector<std::vector<int> > vnAssoDyn;
     // label indicating which object the feature (3D point) belongs to. (k-1)*n
     std::vector<std::vector<int> > vnFeatLabel;
-    // feature tracklets: pair.first = frameID; pair.second = featureID;
+    // Same as TrackletSta, but for Dynamic Features.
     std::vector<std::vector<std::pair<int, int> > > TrackletDyn;
     std::vector<int> nObjID;
 

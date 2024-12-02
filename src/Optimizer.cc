@@ -1251,13 +1251,14 @@ void Optimizer::FullBatchOptimization(Map* pMap, const cv::Mat Calib_K)
 
     // =======================================================================================
 
-    // mark each feature if it is satisfied (valid) for usage
-    // here we use track length as threshold, for static >=3, dynamic >=3.
-    // label each feature of the position in TrackLets: -1(invalid) or >=0(TrackID);
+    // Mark each feature if it is satisfied (valid) for usage.
+    // Here we use a track length threshold (for static >=3, dynamic >=3).
+    // Label each feature of the position in TrackLets: -1(invalid) or >=0(TrackID);
     // size: static: (N)xM_1, M_1 is the size of features in each frame
     // size: dynamic: (N)xM_2, M_2 is the size of features in each frame
-    std::vector<std::vector<int> > vnFeaLabSta(N),vnFeaMakSta(N),vnFeaLabDyn(N),vnFeaMakDyn(N);
-    // initialize
+    std::vector<std::vector<int>> vnFeaLabSta(N),vnFeaMakSta(N),vnFeaLabDyn(N),vnFeaMakDyn(N);
+
+    // Initialize vectors
     for (int i = 0; i < N; ++i)
     {
         std::vector<int>  vnFLS_tmp(pMap->vpFeatSta[i].size(),-1);
@@ -1309,15 +1310,15 @@ void Optimizer::FullBatchOptimization(Map* pMap, const cv::Mat Calib_K)
 
     // =======================================================================================
 
+    // Create the optimizer and set the algorithm
     g2o::SparseOptimizer optimizer;
     g2o::BlockSolverX::LinearSolverType * linearSolver;
     linearSolver = new g2o::LinearSolverCSparse<g2o::BlockSolverX::PoseMatrixType>();
     g2o::BlockSolverX * solver_ptr = new g2o::BlockSolverX(linearSolver);
-    // g2o::OptimizationAlgorithmDogleg* solver = new g2o::OptimizationAlgorithmDogleg(solver_ptr);
     g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
-    // g2o::OptimizationAlgorithmGaussNewton* solver = new g2o::OptimizationAlgorithmGaussNewton(solver_ptr);
     optimizer.setAlgorithm(solver);
 
+    // Set termination based upon the gain
     g2o::SparseOptimizerTerminateAction* terminateAction = new g2o::SparseOptimizerTerminateAction;
     terminateAction->setGainThreshold(1e-4);
     optimizer.addPostIterationAction(terminateAction);
@@ -1353,17 +1354,15 @@ void Optimizer::FullBatchOptimization(Map* pMap, const cv::Mat Calib_K)
     int PreFrameID;
     for (int i = 0; i < N; ++i)
     {
-        // cout << "current processing frame: " << i << endl;
-
-        // (1) save <VERTEX_POSE_R3_SO3>
+        // Make vertex for camera pose in this frame
         g2o::VertexSE3 *v_se3 = new g2o::VertexSE3();
         v_se3->setId(count_unique_id);
         v_se3->setEstimate(Converter::toSE3Quat(pMap->vmCameraPose[i]));
-        // v_se3->setEstimate(Converter::toSE3Quat(IDENTITY_TMP));
         optimizer.addVertex(v_se3);
+
+        // Add prior edge if first frame
         if (count_unique_id==1)
         {
-            // add prior edges
             g2o::EdgeSE3Prior * pose_prior = new g2o::EdgeSE3Prior();
             pose_prior->setVertex(0, optimizer.vertex(count_unique_id));
             pose_prior->setMeasurement(Converter::toSE3Quat(pMap->vmCameraPose[i]));
@@ -1377,12 +1376,9 @@ void Optimizer::FullBatchOptimization(Map* pMap, const cv::Mat Calib_K)
         int CurFrameID = count_unique_id;
         count_unique_id++;
 
-        // cout << " (0) save camera pose " << endl;
-
-        // ****** save camera motion if it is not the first frame ******
+        // Add edge for camera motion between current and previous frame
         if (i!=0)
         {
-            // (2) save <EDGE_R3_SO3>
             g2o::EdgeSE3 * ep = new g2o::EdgeSE3();
             ep->setVertex(0, optimizer.vertex(PreFrameID));
             ep->setVertex(1, optimizer.vertex(CurFrameID));
@@ -1395,7 +1391,6 @@ void Optimizer::FullBatchOptimization(Map* pMap, const cv::Mat Calib_K)
             }
             optimizer.addEdge(ep);
             vpEdgeSE3.push_back(ep);
-            // cout << " (1) save camera motion " << endl;
         }
 
 
@@ -1523,9 +1518,8 @@ void Optimizer::FullBatchOptimization(Map* pMap, const cv::Mat Calib_K)
             }
         }
 
-        // cout << " (2) save static features " << endl;
 
-        // // // ************** save object motion, then dynamic features *************
+        // ************** save object motion, then dynamic features *************
         if (!STATIC_ONLY)
         {
             if (i==0)
@@ -2170,7 +2164,6 @@ void Optimizer::FullBatchOptimization(Map* pMap, const cv::Mat Calib_K)
             }
         }
     }
-
 
 }
 

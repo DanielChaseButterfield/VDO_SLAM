@@ -37,6 +37,14 @@
 
 using namespace std;
 
+/**
+ * This function returns true if the second value
+ * of a is greater than the second value of b, false
+ * otherwise.
+ * 
+ * Returns:
+ *   bool
+ */
 bool SortPairInt(const pair<int,int> &a,
               const pair<int,int> &b)
 {
@@ -50,13 +58,13 @@ Tracking::Tracking(System *pSys, Map *pMap, const string &strSettingPath, const 
     mState(NO_IMAGES_YET), mSensor(sensor), mpSystem(pSys), mpMap(pMap)
 {
     // Load camera parameters from settings file
-
     cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
     float fx = fSettings["Camera.fx"];
     float fy = fSettings["Camera.fy"];
     float cx = fSettings["Camera.cx"];
     float cy = fSettings["Camera.cy"];
 
+    // Create the K matrix
     cv::Mat K = cv::Mat::eye(3,3,CV_32F);
     K.at<float>(0,0) = fx;
     K.at<float>(1,1) = fy;
@@ -64,6 +72,7 @@ Tracking::Tracking(System *pSys, Map *pMap, const string &strSettingPath, const 
     K.at<float>(1,2) = cy;
     K.copyTo(mK);
 
+    // Create vector of Distortion Coefficients
     cv::Mat DistCoef(4,1,CV_32F);
     DistCoef.at<float>(0) = fSettings["Camera.k1"];
     DistCoef.at<float>(1) = fSettings["Camera.k2"];
@@ -77,12 +86,13 @@ Tracking::Tracking(System *pSys, Map *pMap, const string &strSettingPath, const 
     }
     DistCoef.copyTo(mDistCoef);
 
+    // Load other parameters
     mbf = fSettings["Camera.bf"];
-
     float fps = fSettings["Camera.fps"];
     if(fps==0)
         fps=30;
 
+    // Print most useful parameters
     cout << endl << "Camera Parameters: " << endl << endl;
     cout << "- fx: " << fx << endl;
     cout << "- fy: " << fy << endl;
@@ -90,7 +100,7 @@ Tracking::Tracking(System *pSys, Map *pMap, const string &strSettingPath, const 
     cout << "- cy: " << cy << endl;
     cout << "- fps: " << fps << endl;
 
-
+    // Load color order
     int nRGB = fSettings["Camera.RGB"];
     mbRGB = nRGB;
 
@@ -106,13 +116,13 @@ Tracking::Tracking(System *pSys, Map *pMap, const string &strSettingPath, const 
     int fIniThFAST = fSettings["ORBextractor.iniThFAST"];
     int fMinThFAST = fSettings["ORBextractor.minThFAST"];
 
+    // Create ORB Feature Extractors
     mpORBextractorLeft = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
-
     if(sensor==System::STEREO)
         mpORBextractorRight = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
+    // Load parameter to track current dataset
     cout << endl << "System Parameters: " << endl << endl;
-
     int DataCode = fSettings["ChooseData"];
     switch (DataCode)
     {
@@ -133,6 +143,7 @@ Tracking::Tracking(System *pSys, Map *pMap, const string &strSettingPath, const 
             cout << "- tested dataset: S3E_Teaching_Building_1" << endl;
     }
 
+    // Get depth thresholds
     if(sensor==System::STEREO || sensor==System::RGBD)
     {
         mThDepth = (float)fSettings["ThDepthBG"];
@@ -140,6 +151,7 @@ Tracking::Tracking(System *pSys, Map *pMap, const string &strSettingPath, const 
         cout << "- depth threshold (background/object): " << mThDepth << "/" << mThDepthObj << endl;
     }
 
+    //  Get depth map factor
     if(sensor==System::RGBD)
     {
         mDepthMapFactor = fSettings["DepthMapFactor"];
@@ -196,14 +208,14 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, cv::Mat &imD, const cv::Ma
             {
                 if (mTestData==OMD)
                 {
-                    // --- for stereo depth map ---
+                    // For stereo disparity map, convert to depth
                     imD.at<float>(i,j) = mbf/(imD.at<float>(i,j)/mDepthMapFactor);
                     // --- for RGB-D depth map ---
                     // imD.at<float>(i,j) = imD.at<float>(i,j)/mDepthMapFactor;
                 }
                 else if (mTestData==KITTI)
                 {
-                    // --- for stereo depth map ---
+                    // For stereo disparity map, convert to depth
                     imD.at<float>(i,j) = mbf/(imD.at<float>(i,j)/mDepthMapFactor);
                     // --- for monocular depth map ---
                     // imD.at<float>(i,j) = imD.at<float>(i,j)/500.0;

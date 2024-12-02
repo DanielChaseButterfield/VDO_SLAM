@@ -3,10 +3,13 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "/usr/include/opencv4",
+                "/usr/include/eigen3",
+                "//home/dbutterfield3/Research/VDO_SLAM/include/**"
             ],
             "defines": [],
-            "compilerPath": "/usr/bin/clang-14",
+            "compilerPath": null,
             "cStandard": "c17",
             "cppStandard": "c++14",
             "intelliSenseMode": "linux-clang-x64"

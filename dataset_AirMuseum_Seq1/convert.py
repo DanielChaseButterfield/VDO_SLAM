@@ -85,7 +85,7 @@ def load_images_and_timestamps(bag_path, topic_name, num_images, starting_index)
 
     return timestamps, timestamps_num, images
 
-def extract_images_and_ts(bag_path, topic_name, path_name):
+def extract_images_and_ts(bag_path, topic_name, path_name, visualize_flow=False, visualize_disparity=True):
     # Set entries to save
     num_dataset_entries = 100
     starting_index = 400
@@ -99,6 +99,7 @@ def extract_images_and_ts(bag_path, topic_name, path_name):
     # Set up paths to save files
     path_to_save_100_images = Path(Path.cwd(), 'datasets', path_name, 'image_0').absolute()
     path_to_save_101_images = Path(Path.cwd(), 'datasets', path_name, 'image_1').absolute()
+    path_to_save_100_flow = Path(Path.cwd(), 'datasets', path_name, 'flow').absolute()
     path_to_gt_pose_vdo = Path(Path.cwd(), 'datasets', path_name, "pose_gt.txt").absolute()
     path_to_times_file = Path(Path.cwd(), 'datasets', path_name, 'times.txt').absolute()
 
@@ -204,7 +205,64 @@ def extract_images_and_ts(bag_path, topic_name, path_name):
             if i < len(pose_ts_num) - 1:
                 time_str += "\n"
             f.write(time_str)
-    
+
+    # Calculate dense optical flow using OpenCV
+    for i in range(len(used_images_1_idx) - 1):
+        image_prev = images_1[used_images_1_idx[i]]
+        image_next = images_1[used_images_1_idx[i+1]]
+
+        # Calculate dense optical flow using Farneback's method
+        flow = cv2.calcOpticalFlowFarneback(
+            prev=image_prev,
+            next=image_next,
+            flow=None,
+            pyr_scale=0.5,  # Image scale (<1) to build pyramids
+            levels=3,       # Number of pyramid layers
+            winsize=15,     # Averaging window size
+            iterations=3,   # Number of iterations at each pyramid level
+            poly_n=5,       # Size of pixel neighborhood
+            poly_sigma=1.2, # Gaussian standard deviation
+            flags=0         # Operation flags (0 for default)
+        )
+
+        # Save the calculated flow
+        flow_name = str(i).rjust(6, '0') + ".flo"
+        cv2.writeOpticalFlow(str(Path(path_to_save_100_flow, flow_name)), flow)
+
+        # Visualize the optical flow (convert flow to HSV)
+        if visualize_flow:
+            magnitude, angle = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+            hsv = np.zeros_like(cv2.cvtColor(image_prev, cv2.COLOR_GRAY2BGR))
+            hsv[..., 0] = angle * 180 / np.pi / 2  # Hue: direction
+            hsv[..., 1] = 255                      # Saturation: full
+            hsv[..., 2] = cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX)  # Value: magnitude
+            rgb_flow = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+
+            #Display the result
+            cv2.imshow('Dense Optical Flow', rgb_flow)
+            cv2.waitKey(0)
+
+    # Calculate disparity map using OpenCV StereoSGBM
+    # for i in range(len(used_images_1_idx)):
+    #     image_left = images_2[used_images_2_idx[i]]
+    #     image_right = images_1[used_images_1_idx[i]]
+
+    #     # Create a StereoBM object and compute the disparity map
+    #     stereo = cv2.StereoBM.create(numDisparities=16*6, blockSize=25)
+    #     disparity = stereo.compute(image_left,image_right)
+    #     disparity = np.clip(disparity, 0, 255)
+    #     print(disparity)
+
+    #     # Normalize the disparity map for visualization
+    #     if visualize_disparity:
+    #         import matplotlib.pyplot as plt
+    #         disparity = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+    #         print(disparity)
+    #         cv2.imshow('Dense Optical Flow', disparity)
+    #         cv2.waitKey(0)
+
+    cv2.destroyAllWindows()
+
 def main():
     # Run test cases
     test_cases()

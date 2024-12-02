@@ -140,13 +140,10 @@ int main(int argc, char **argv)
         // Pass the image to the SLAM system
         SLAM.TrackRGBD(imRGB,imD_f,imFlow,imSem,mTcw_gt,vObjPose_gt,tframe,imTraj,nImages);
 
-        
-
     }
 
     // Save camera trajectory
-    // SLAM.SaveResults("/Users/steed/work/code/Evaluation/ijrr2020/omd/omd_results/new/");
-    // SLAM.SaveResults("/Users/steed/work/code/Evaluation/ijrr2020/00/new/");
+    //SLAM.SaveResults("/root/VDO_SLAM/Evaluation/");
 
     return 0;
 }
