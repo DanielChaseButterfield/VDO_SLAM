@@ -5,6 +5,7 @@ import cv2
 import math
 from scipy.spatial.transform import Rotation
 import copy
+import yaml
 
 def test_cases():
     # ================ Test find_idx_of_nearest() ================
@@ -85,7 +86,7 @@ def load_images_and_timestamps(bag_path, topic_name, num_images, starting_index)
 
     return timestamps, timestamps_num, images
 
-def extract_images_and_ts(bag_path, topic_name, path_name, visualize_flow=False, visualize_disparity=True):
+def extract_images_and_ts(bag_path, topic_name, path_name, calib_file, visualize_flow=False, visualize_disparity=True):
     # Set entries to save
     num_dataset_entries = 100
     starting_index = 400
@@ -102,6 +103,36 @@ def extract_images_and_ts(bag_path, topic_name, path_name, visualize_flow=False,
     path_to_save_100_flow = Path(Path.cwd(), 'datasets', path_name, 'flow').absolute()
     path_to_gt_pose_vdo = Path(Path.cwd(), 'datasets', path_name, "pose_gt.txt").absolute()
     path_to_times_file = Path(Path.cwd(), 'datasets', path_name, 'times.txt').absolute()
+
+    # Load in calibration yaml files
+    path_to_calib = Path(Path.cwd(), 'dataset_AirMuseum_Seq1', 'sensors', calib_file)
+    yaml_file = None
+    with open(str(path_to_calib)) as stream:
+        yaml_file = yaml.safe_load(stream)
+
+    # Calculate camera intrinsic matrices
+    params_0 = yaml_file["cam0"]["intrinsics"]
+    intrins_1 = np.array([  [params_0[0],            0, params_0[2]], 
+                            [          0,  params_0[1], params_0[3]],
+                            [          0,            0,           1]])
+    params_1 = yaml_file["cam1"]["intrinsics"]
+    intrins_2 = np.array([  [params_1[0],            0, params_1[2]], 
+                            [          0,  params_1[1], params_1[3]],
+                            [          0,            0,           1]])
+    
+    # Load distortion coefficients
+    D1 = np.array(yaml_file["cam0"]["distortion_coeffs"])
+    D2 = np.array(yaml_file["cam1"]["distortion_coeffs"])
+
+    # Load the camera 1 to 0 transformation
+    H_cam1_to_cam0 = np.array(yaml_file["cam1"]["T_cn_cnm1"])
+    R_cam1_to_cam0 = H_cam1_to_cam0[0:3,0:3]
+    T_cam1_to_cam0 = np.array([H_cam1_to_cam0[0:3,3]]).transpose()
+
+    # Convert to Camera 0 to camera 1 transformation
+    # This is what we need for Stereo Rectify: https://stackoverflow.com/questions/28678985/exact-definition-of-the-matrices-in-opencv-stereorectify
+    R_cam0_to_cam1 = R_cam1_to_cam0.transpose()
+    T_cam0_to_cam1 = -T_cam1_to_cam0
 
     # Read in all the pose lines
     pose_ts = []
@@ -153,8 +184,21 @@ def extract_images_and_ts(bag_path, topic_name, path_name, visualize_flow=False,
             f.write(line)
 
     # Load images and timestamps for both cameras
-    ts_1, ts_num_1, images_1 = load_images_and_timestamps(path_to_bag_100, topic_name + "/cam100/image_raw", None, None)
-    ts_2, ts_num_2, images_2 = load_images_and_timestamps(path_to_bag_101, topic_name + "/cam101/image_raw", None, None)
+    ts_1, ts_num_1, distorted_images_1 = load_images_and_timestamps(path_to_bag_100, topic_name + "/cam100/image_raw", None, None)
+    ts_2, ts_num_2, distorted_images_2 = load_images_and_timestamps(path_to_bag_101, topic_name + "/cam101/image_raw", None, None)
+
+    # Calculate mappings to undistort/rectify stereo images
+    image_shape = distorted_images_1[0].shape
+    image_shape = (image_shape[1], image_shape[0]) # Need to flip image shape, probably due to numpy vs. opencv dimension differences
+    R1, R2, P1, P2, Q = cv2.fisheye.stereoRectify(intrins_1, D1, intrins_2, D2, image_shape, R_cam0_to_cam1, T_cam0_to_cam1, cv2.fisheye.CALIB_ZERO_DISPARITY)
+    map1_x, map1_y = cv2.fisheye.initUndistortRectifyMap(intrins_1, D1, R1, P1, image_shape, cv2.CV_32FC1)
+    map2_x, map2_y = cv2.fisheye.initUndistortRectifyMap(intrins_2, D2, R2, P2, image_shape, cv2.CV_32FC1)
+    print("\nConverting " + bag_path + "...")
+    newK1, _, _, _, _, _, _ = cv2.decomposeProjectionMatrix(P1)
+    newK2, _, _, _, _, _, _ = cv2.decomposeProjectionMatrix(P2)
+    print("New Camera 1 Projection Matrix: ", newK1)
+    print("New Camera 2 Projection Matrix: ", newK2)
+    print("")
 
     # Keep track of used images
     used_images_1_idx = []
@@ -162,6 +206,8 @@ def extract_images_and_ts(bag_path, topic_name, path_name, visualize_flow=False,
     used_images_gt_ts = []
     used_images_1_ts = []
     used_images_2_ts = []
+    images_1 = []
+    images_2 = []
 
     # Write the closest camera 100 and camera 101 images to each pose
     for i in range(0, len(pose_ts_num)):
@@ -183,15 +229,20 @@ def extract_images_and_ts(bag_path, topic_name, path_name, visualize_flow=False,
 
         used_images_gt_ts.append(pose_ts_num[i])
 
+        # Undistort & rectify the stereo images
+        image_1_rectified = cv2.remap(distorted_images_1[idx1], map1_x, map1_y, cv2.INTER_CUBIC)
+        image_2_rectified = cv2.remap(distorted_images_2[idx2], map2_x, map2_y, cv2.INTER_CUBIC)
+
         # Write both images
         image_name = str(i).rjust(6, '0') + ".jpeg"
-        if not cv2.imwrite(Path(path_to_save_100_images, image_name), images_1[idx1]):
+        if not cv2.imwrite(Path(path_to_save_100_images, image_name), image_1_rectified):
             print("Could not write image")
-        if not cv2.imwrite(Path(path_to_save_101_images, image_name), images_2[idx2]):
+        if not cv2.imwrite(Path(path_to_save_101_images, image_name), image_2_rectified):
             print("Could not write image")
+        images_1.append(image_1_rectified)
+        images_2.append(image_2_rectified)
 
     # Validate the the error is low enough
-    print("Converting " + bag_path + "...")
     print("(Camera 1) Average Time Sync Difference to GT: ", calculate_avg_time_diff(used_images_gt_ts, used_images_1_ts))
     print("Standard Deviation: ", np.std(np.array(used_images_gt_ts) - np.array(used_images_1_ts)))
     print("(Camera 2) Average Time Sync Difference to GT: ", calculate_avg_time_diff(used_images_gt_ts, used_images_2_ts))
@@ -208,8 +259,8 @@ def extract_images_and_ts(bag_path, topic_name, path_name, visualize_flow=False,
 
     # Calculate dense optical flow using OpenCV
     for i in range(len(used_images_1_idx) - 1):
-        image_prev = images_1[used_images_1_idx[i]]
-        image_next = images_1[used_images_1_idx[i+1]]
+        image_prev = images_1[i]
+        image_next = images_1[i+1]
 
         # Calculate dense optical flow using Farneback's method
         flow = cv2.calcOpticalFlowFarneback(
@@ -244,8 +295,8 @@ def extract_images_and_ts(bag_path, topic_name, path_name, visualize_flow=False,
 
     # Calculate disparity map using OpenCV StereoSGBM
     # for i in range(len(used_images_1_idx)):
-    #     image_left = images_2[used_images_2_idx[i]]
-    #     image_right = images_1[used_images_1_idx[i]]
+    #     image_left = images_2[i]
+    #     image_right = images_1[i]
 
     #     # Create a StereoBM object and compute the disparity map
     #     stereo = cv2.StereoBM.create(numDisparities=16*6, blockSize=25)
@@ -261,15 +312,15 @@ def extract_images_and_ts(bag_path, topic_name, path_name, visualize_flow=False,
     #         cv2.imshow('Dense Optical Flow', disparity)
     #         cv2.waitKey(0)
 
-    cv2.destroyAllWindows()
+    # cv2.destroyAllWindows()
 
 def main():
     # Run test cases
     test_cases()
 
     # NOTE: At least for robot A, cam100 is right eye, cam101 is left eye
-    extract_images_and_ts('scenario1_robotA', '/robotA', 'AirMuseum-Seq1-A')
-    extract_images_and_ts('scenario1_robotB', '/robotB', 'AirMuseum-Seq1-B')
+    extract_images_and_ts('scenario1_robotA', '/robotA', 'AirMuseum-Seq1-A', 'robotA_cameras_calib.yaml')
+    extract_images_and_ts('scenario1_robotB', '/robotB', 'AirMuseum-Seq1-B', 'robotB_cameras_calib.yaml')
 
 if __name__ == "__main__":
     main()
