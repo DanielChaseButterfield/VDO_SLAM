@@ -139,8 +139,8 @@ Tracking::Tracking(System *pSys, Map *pMap, const string &strSettingPath, const 
             cout << "- tested dataset: Virtual KITTI " << endl;
             break;
         case 4:
-            mTestData = S3E_Teaching_Building_1;
-            cout << "- tested dataset: S3E_Teaching_Building_1" << endl;
+            mTestData = AirMuseum;
+            cout << "- tested dataset: AirMuseum" << endl;
     }
 
     // Get depth thresholds
@@ -220,7 +220,7 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, cv::Mat &imD, const cv::Ma
                     // --- for monocular depth map ---
                     // imD.at<float>(i,j) = imD.at<float>(i,j)/500.0;
                 }
-                else if (mTestData==S3E_Teaching_Building_1) {
+                else if (mTestData==AirMuseum) {
                     throw NotImplementedException("Not Implemented");
                 }
             }
@@ -363,7 +363,7 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, cv::Mat &imD, const cv::Ma
             mCurrentFrame.vObjPose_gt[i] = ObjPoseParsingOX(vObjPose_gt[i]);
         else if (mTestData==KITTI)
             mCurrentFrame.vObjPose_gt[i] = ObjPoseParsingKT(vObjPose_gt[i]);
-        else if (mTestData==S3E_Teaching_Building_1)
+        else if (mTestData==AirMuseum)
             throw NotImplementedException("Not Implemented");
     }
 
@@ -829,7 +829,7 @@ void Tracking::Track()
                         L_w_p = Last_Twc_gt*L_p;
                         // cout << "what is L_w_p: " << endl << L_w_p << endl;
                     }
-                    else if (mTestData==S3E_Teaching_Building_1) {
+                    else if (mTestData==AirMuseum) {
                         throw NotImplementedException("Not Implemented");
                     }
                     bCheckGT1 = true;
@@ -851,7 +851,7 @@ void Tracking::Track()
                         L_w_c = Curr_Twc_gt*L_c;
                         // cout << "what is L_w_c: " << endl << L_w_c << endl;
                     }
-                    else if (mTestData==S3E_Teaching_Building_1) {
+                    else if (mTestData==AirMuseum) {
                         throw NotImplementedException("Not Implemented");
                     }
                     mCurrentFrame.vObjBoxID[i] = k;
@@ -1238,7 +1238,7 @@ void Tracking::Track()
             // GetVelocityError(mpMap->vmRigidMotion_RF, mpMap->vp3DPointDyn, mpMap->vnFeatLabel,
             //                  mpMap->vnRMLabel, mpMap->vfAllSpeed_GT, mpMap->vnAssoDyn, mpMap->vbObjStat);
         }
-        else if (mTestData==S3E_Teaching_Building_1) {
+        else if (mTestData==AirMuseum) {
             throw NotImplementedException("Not Implemented");
         }
     }
@@ -1440,7 +1440,7 @@ std::vector<std::vector<int> > Tracking::DynObjTracking()
     {
         shrin_thr_row = 25;
         shrin_thr_col = 50;
-    } else if (mTestData==S3E_Teaching_Building_1) {
+    } else if (mTestData==AirMuseum) {
         throw NotImplementedException("Not Implemented");
     }
 
