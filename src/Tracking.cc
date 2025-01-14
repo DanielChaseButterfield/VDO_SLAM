@@ -221,7 +221,9 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, cv::Mat &imD, const cv::Ma
                     // imD.at<float>(i,j) = imD.at<float>(i,j)/500.0;
                 }
                 else if (mTestData==AirMuseum) {
-                    throw NotImplementedException("Not Implemented");
+                    // imD currently contains disparity values multiplied by the depth factor.
+                    // Thus, convert back to original disparity values, and then solve for depth.
+                    imD.at<float>(i,j) = mbf/(imD.at<float>(i,j)/mDepthMapFactor);
                 }
             }
         }
@@ -364,7 +366,8 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, cv::Mat &imD, const cv::Ma
         else if (mTestData==KITTI)
             mCurrentFrame.vObjPose_gt[i] = ObjPoseParsingKT(vObjPose_gt[i]);
         else if (mTestData==AirMuseum)
-            throw NotImplementedException("Not Implemented");
+            // No Ground Truth pose for this dataset, so this should never be called
+            throw std::length_error("No Ground Truth Poses should be pass with the AirMuseum Dataset");
     }
 
     // Save temperal matches for visualization
@@ -617,7 +620,34 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, cv::Mat &imD, const cv::Ma
         else
             cv::waitKey(1);
     }
+    else if (mTestData==AirMuseum)
+    {
+        // Set the parameters for the cv display
+        int sta_x = 300, sta_y = 100, radi = 1, thic = 2;  // (160/120/2/5)
+        float scale = 100;
 
+        // Get the Pose (I'm unclear why they invert it)
+        cv::Mat CamPos = Converter::toInvMatrix(mCurrentFrame.mTcw_gt);
+
+        // Visualize the Pose in text form
+        char text[100];
+        sprintf(text, "GT Pose (shown in Red): x = %02fm y = %02fm z = %02fm", CamPos.at<float>(0,3), CamPos.at<float>(1,3), CamPos.at<float>(2,3));
+        
+        // Draw a red square for the GT Pose
+        int x = int(CamPos.at<float>(0,3)*scale) + sta_x;
+        int y = int(CamPos.at<float>(2,3)*scale) + sta_y;
+        cv::rectangle(imTraj, cv::Point(x, y), cv::Point(x+5, y+5), cv::Scalar(0,0,255),1);
+
+        // Get the estimated Camera Pose, draw a green square
+        CamPos = Converter::toInvMatrix(mCurrentFrame.mTcw);
+        x = int(CamPos.at<float>(0,3)*scale) + sta_x;
+        y = int(CamPos.at<float>(2,3)*scale) + sta_y;
+        cv::rectangle(imTraj, cv::Point(x, y), cv::Point(x+5, y+5), cv::Scalar(0,255,0),1);
+
+        // Show the Trajectories
+        imshow( "Camera and Object Trajectories", imTraj);
+        cv::waitKey(1);
+    }
 
     if(timestamp!=0 && bFrame2Frame == true && mTestData==OMD)
     {
@@ -830,7 +860,9 @@ void Tracking::Track()
                         // cout << "what is L_w_p: " << endl << L_w_p << endl;
                     }
                     else if (mTestData==AirMuseum) {
-                        throw NotImplementedException("Not Implemented");
+                        // AirMuseum doesn't have ground truth object poses,
+                        // so just return identity.
+                        L_w_p = cv::Mat::eye(4,4,CV_32F);
                     }
                     bCheckGT1 = true;
                     break;
@@ -852,7 +884,9 @@ void Tracking::Track()
                         // cout << "what is L_w_c: " << endl << L_w_c << endl;
                     }
                     else if (mTestData==AirMuseum) {
-                        throw NotImplementedException("Not Implemented");
+                        // AirMuseum doesn't have ground truth object poses,
+                        // so just return identity.
+                        L_w_c = cv::Mat::eye(4,4,CV_32F);
                     }
                     mCurrentFrame.vObjBoxID[i] = k;
                     bCheckGT2 = true;
@@ -1227,7 +1261,7 @@ void Tracking::Track()
         // GetVelocityError(mpMap->vmRigidMotion, mpMap->vp3DPointDyn, mpMap->vnFeatLabel,
         //                  mpMap->vnRMLabel, mpMap->vfAllSpeed_GT, mpMap->vnAssoDyn, mpMap->vbObjStat);
 
-        if (bGlobalBatch && mTestData==KITTI)
+        if (bGlobalBatch && (mTestData==KITTI || mTestData==AirMuseum))
         {
             // Get Full Batch Optimization
             Optimizer::FullBatchOptimization(mpMap,mK);
@@ -1237,9 +1271,6 @@ void Tracking::Track()
                            mpMap->vmCameraPose_GT,mpMap->vmRigidMotion_GT, mpMap->vbObjStat);
             // GetVelocityError(mpMap->vmRigidMotion_RF, mpMap->vp3DPointDyn, mpMap->vnFeatLabel,
             //                  mpMap->vnRMLabel, mpMap->vfAllSpeed_GT, mpMap->vnAssoDyn, mpMap->vbObjStat);
-        }
-        else if (mTestData==AirMuseum) {
-            throw NotImplementedException("Not Implemented");
         }
     }
 
@@ -1441,7 +1472,14 @@ std::vector<std::vector<int> > Tracking::DynObjTracking()
         shrin_thr_row = 25;
         shrin_thr_col = 50;
     } else if (mTestData==AirMuseum) {
-        throw NotImplementedException("Not Implemented");
+        // Temporarily, for first prototype, we'll also shrink the image, so that objects
+        // that are mostly nearly the edge of the image boundary are labeled
+        // as outlier/unknown in mCurrentFrame.vObjLabel. Also looks like it
+        // doesn't track objects that are removed this way.
+        //
+        // This is subject to change later.
+        shrin_thr_row = 25;
+        shrin_thr_col = 50;
     }
 
     for (int i = 0; i < Posi.size(); ++i)

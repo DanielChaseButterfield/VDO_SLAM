@@ -87,6 +87,8 @@ def load_images_and_timestamps(bag_path, topic_name, num_images, starting_index)
     return timestamps, timestamps_num, images
 
 def extract_images_and_ts(bag_path, topic_name, path_name, calib_file, visualize_flow=False, visualize_disparity=True):
+    print("============ Extracting Sequence: ", bag_path, " ============")
+
     # Set entries to save
     num_dataset_entries = 100
     starting_index = 400
@@ -98,9 +100,9 @@ def extract_images_and_ts(bag_path, topic_name, path_name, calib_file, visualize
     path_to_gt_pose_original = Path(path_to_dataset, "cam100_stamped_groundtruth.txt").absolute()
 
     # Set up paths to save files
-    path_to_save_100_images = Path(Path.cwd(), 'datasets', path_name, 'image_0').absolute()
-    path_to_save_101_images = Path(Path.cwd(), 'datasets', path_name, 'image_1').absolute()
-    path_to_save_100_flow = Path(Path.cwd(), 'datasets', path_name, 'flow').absolute()
+    path_to_save_R_images = Path(Path.cwd(), 'datasets', path_name, 'image_R').absolute()
+    path_to_save_L_images = Path(Path.cwd(), 'datasets', path_name, 'image_L').absolute()
+    path_to_save_L_flow = Path(Path.cwd(), 'datasets', path_name, 'flow_L').absolute()
     path_to_gt_pose_vdo = Path(Path.cwd(), 'datasets', path_name, "pose_gt.txt").absolute()
     path_to_times_file = Path(Path.cwd(), 'datasets', path_name, 'times.txt').absolute()
 
@@ -129,6 +131,9 @@ def extract_images_and_ts(bag_path, topic_name, path_name, calib_file, visualize
     H_camL_to_camR = np.array(yaml_file["cam1"]["T_cn_cnm1"])
     R_camL_to_camR = H_camL_to_camR[0:3,0:3]
     T_camL_to_camR = np.array(H_camL_to_camR[0:3,3]).transpose()
+
+    # Calculate the camera 0 to camera 1 transformation
+    H_camR_to_camL = np.linalg.inv(H_camL_to_camR)
 
     # Read in all the pose lines
     pose_ts = []
@@ -166,14 +171,18 @@ def extract_images_and_ts(bag_path, topic_name, path_name, calib_file, visualize
         # Iterate through each pose
         for i in range(0, len(pose_ts)):        
             # Calculate the H matrix for this translation and quaternion
-            T = np.array([pose_data[i][0:3]]).transpose()
-            R = Rotation.from_quat(np.array(pose_data[i][3:])).as_matrix()
-            H = np.concatenate((R, T), axis=1)
-            H = np.concatenate((H, np.array([[0, 0, 0, 1]])), axis=0)
+            T_camR = np.array([pose_data[i][0:3]]).transpose()
+            R_camR = Rotation.from_quat(np.array(pose_data[i][3:])).as_matrix()
+            H_camR = np.concatenate((R_camR, T_camR), axis=1)
+            print(H_camR)
+            H_camR = np.concatenate((H_camR, np.array([[0, 0, 0, 1]])), axis=0)
+
+            # This H is for the right camera, but we need it for the left
+            H_camL = H_camR_to_camL @ H_camR
 
             # Write the result
-            line = str(pose_ts[i])
-            for row in H:
+            line = str(i)
+            for row in H_camL:
                 for val in row:
                     line += " " + str(val)
             line += "\n"
@@ -189,7 +198,6 @@ def extract_images_and_ts(bag_path, topic_name, path_name, calib_file, visualize
     RL, RR, PL, PR, Q = cv2.fisheye.stereoRectify(intrins_L, DL, intrins_R, DR, image_shape, R_camL_to_camR, T_camL_to_camR, cv2.fisheye.CALIB_ZERO_DISPARITY)
     mapL_x, mapL_y = cv2.fisheye.initUndistortRectifyMap(intrins_L, DL, RL, PL, image_shape, cv2.CV_32FC1)
     mapR_x, mapR_y = cv2.fisheye.initUndistortRectifyMap(intrins_R, DR, RR, PR, image_shape, cv2.CV_32FC1)
-    print("\nConverting " + bag_path + "...")
     newKL, _, _, _, _, _, _ = cv2.decomposeProjectionMatrix(PL)
     newKR, _, _, _, _, _, _ = cv2.decomposeProjectionMatrix(PR)
     print("New Camera Left Projection Matrix: ", newKL)
@@ -238,9 +246,9 @@ def extract_images_and_ts(bag_path, topic_name, path_name, calib_file, visualize
 
         # Write both images
         image_name = str(i).rjust(6, '0') + ".jpeg"
-        if not cv2.imwrite(Path(path_to_save_100_images, image_name), image_R_rectified):
+        if not cv2.imwrite(Path(path_to_save_R_images, image_name), image_R_rectified):
             print("Could not write image")
-        if not cv2.imwrite(Path(path_to_save_101_images, image_name), image_L_rectified):
+        if not cv2.imwrite(Path(path_to_save_L_images, image_name), image_L_rectified):
             print("Could not write image")
         images_L.append(image_L_rectified)
         images_R.append(image_R_rectified)
@@ -269,16 +277,16 @@ def extract_images_and_ts(bag_path, topic_name, path_name, calib_file, visualize
 
     # Write the timestamps to a file
     with open(path_to_times_file, "w") as f:
-        for i, stamp in enumerate(pose_ts_num):
+        for i, stamp in enumerate(pose_ts):
             time_str = str(stamp)
-            if i < len(pose_ts_num) - 1:
+            if i < len(pose_ts) - 1:
                 time_str += "\n"
             f.write(time_str)
 
     # Calculate dense optical flow using OpenCV
-    for i in range(len(used_images_R_idx) - 1):
-        image_prev = images_R[i]
-        image_next = images_R[i+1]
+    for i in range(len(used_images_L_idx) - 1):
+        image_prev = images_L[i]
+        image_next = images_L[i+1]
 
         # Calculate dense optical flow using Farneback's method
         flow = cv2.calcOpticalFlowFarneback(
@@ -296,7 +304,8 @@ def extract_images_and_ts(bag_path, topic_name, path_name, calib_file, visualize
 
         # Save the calculated flow
         flow_name = str(i).rjust(6, '0') + ".flo"
-        cv2.writeOpticalFlow(str(Path(path_to_save_100_flow, flow_name)), flow)
+        if not cv2.writeOpticalFlow(str(Path(path_to_save_L_flow, flow_name)), flow):
+            print("Could not write Optical Flow")
 
         # Visualize the optical flow (convert flow to HSV)
         if visualize_flow:
@@ -342,6 +351,12 @@ def extract_images_and_ts(bag_path, topic_name, path_name, calib_file, visualize
 
     # cv2.destroyAllWindows()
 
+    # Calculate Baseline distance for Settings file
+    baseline = np.sqrt(T_camL_to_camR[0]**2 + \
+                       T_camL_to_camR[1]**2 + \
+                       T_camL_to_camR[2]**2)
+    print("Baseline: ", baseline)
+
 def main():
     # Run test cases
     test_cases()
@@ -349,6 +364,9 @@ def main():
     # NOTE: At least for robot A, cam100 is right eye, cam101 is left eye
     extract_images_and_ts('scenario1_robotA', '/robotA', 'AirMuseum-Seq1-A', 'robotA_cameras_calib.yaml')
     extract_images_and_ts('scenario1_robotB', '/robotB', 'AirMuseum-Seq1-B', 'robotB_cameras_calib.yaml')
+
+    # Currently, disparity is calulated using mobilestereonet.
+    # Also, Semantic Segmentation is done by CAT-SEG, but sadly it's NOT Instance Segementation, so this needs to be replaced.
 
 if __name__ == "__main__":
     main()
