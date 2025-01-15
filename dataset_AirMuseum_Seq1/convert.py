@@ -174,7 +174,6 @@ def extract_images_and_ts(bag_path, topic_name, path_name, calib_file, visualize
             T_camR = np.array([pose_data[i][0:3]]).transpose()
             R_camR = Rotation.from_quat(np.array(pose_data[i][3:])).as_matrix()
             H_camR = np.concatenate((R_camR, T_camR), axis=1)
-            print(H_camR)
             H_camR = np.concatenate((H_camR, np.array([[0, 0, 0, 1]])), axis=0)
 
             # This H is for the right camera, but we need it for the left

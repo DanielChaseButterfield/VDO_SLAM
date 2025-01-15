@@ -1271,6 +1271,35 @@ void Tracking::Track()
                            mpMap->vmCameraPose_GT,mpMap->vmRigidMotion_GT, mpMap->vbObjStat);
             // GetVelocityError(mpMap->vmRigidMotion_RF, mpMap->vp3DPointDyn, mpMap->vnFeatLabel,
             //                  mpMap->vnRMLabel, mpMap->vfAllSpeed_GT, mpMap->vnAssoDyn, mpMap->vbObjStat);
+
+            // Make a new plot just for the final optimized result
+            if (mTestData==AirMuseum)
+            {
+                // Set the parameters for the cv display
+                int sta_x = 300, sta_y = 100, radi = 1, thic = 2;  // (160/120/2/5)
+                float scale = 100;
+                cv::Mat imTrajFinal(1000, 1000, CV_8UC3, cv::Scalar(255,255,255));
+
+                for(int i = 0; i < mpMap->vmCameraPose_GT.size(); i++) {
+                    // Get the Pose
+                    cv::Mat CamPos = mpMap->vmCameraPose_GT[i];
+                
+                    // Draw a red square for the GT Pose
+                    int x = int(CamPos.at<float>(0,3)*scale) + sta_x;
+                    int y = int(CamPos.at<float>(2,3)*scale) + sta_y;
+                    cv::rectangle(imTrajFinal, cv::Point(x, y), cv::Point(x+5, y+5), cv::Scalar(0,0,255),1);
+
+                    // Get the estimated Camera Pose, draw a green square
+                    CamPos = mpMap->vmCameraPose_RF[i];
+                    x = int(CamPos.at<float>(0,3)*scale) + sta_x;
+                    y = int(CamPos.at<float>(2,3)*scale) + sta_y;
+                    cv::rectangle(imTrajFinal, cv::Point(x, y), cv::Point(x+5, y+5), cv::Scalar(0,255,0),1);
+                }
+
+                // Show the Trajectories
+                imshow( "(Optimized) Camera and Object Trajectories", imTrajFinal);
+                cv::waitKey(0);
+            }
         }
     }
 
@@ -3320,7 +3349,7 @@ void Tracking::GetMetricError(const std::vector<cv::Mat> &CamPose, const std::ve
                     const std::vector<cv::Mat> &CamPose_gt, const std::vector<std::vector<cv::Mat> > &RigMot_gt,
                     const std::vector<std::vector<bool> > &ObjStat)
 {
-    bool bRMSError = false;
+    bool bRMSError = true;
     cout << "=================================================" << endl;
 
     // absolute trajectory error for CAMERA (RMSE)
@@ -3331,9 +3360,20 @@ void Tracking::GetMetricError(const std::vector<cv::Mat> &CamPose, const std::ve
         cv::Mat T_lc_inv = CamPose[i]*Converter::toInvMatrix(CamPose[i-1]);
         cv::Mat T_lc_gt = CamPose_gt[i-1]*Converter::toInvMatrix(CamPose_gt[i]);
         cv::Mat ate_cam = T_lc_inv*T_lc_gt;
+        // cout << "[";
+        // for(int a = 0; a < T_lc_gt.rows; a++) {
+        //     for(int b = 0; b < T_lc_gt.cols; b++) {
+        //         cout << T_lc_gt.at<float>(a,b) << " ";
+        //     }
+        //     cout << endl;
+        // }
+        // cout << "]" << endl;
         // cv::Mat ate_cam = CamPose[i]*Converter::toInvMatrix(CamPose_gt[i]);
 
         // translation
+        // cout << ate_cam.at<float>(0,3)*ate_cam.at<float>(0,3) << endl;
+        // cout << ate_cam.at<float>(1,3)*ate_cam.at<float>(1,3) << endl;
+        // cout << ate_cam.at<float>(2,3)*ate_cam.at<float>(2,3) << endl;
         float t_ate_cam = std::sqrt(ate_cam.at<float>(0,3)*ate_cam.at<float>(0,3) + ate_cam.at<float>(1,3)*ate_cam.at<float>(1,3) + ate_cam.at<float>(2,3)*ate_cam.at<float>(2,3));
         if (bRMSError)
             t_sum = t_sum + t_ate_cam*t_ate_cam;
@@ -3355,7 +3395,7 @@ void Tracking::GetMetricError(const std::vector<cv::Mat> &CamPose, const std::ve
         else
             r_sum = r_sum + r_ate_cam;
 
-        // cout << " t: " << t_ate_cam << " R: " << r_ate_cam << endl;
+        //cout << " t: " << t_ate_cam << " R: " << r_ate_cam << endl;
     }
     if (bRMSError)
     {
@@ -3435,10 +3475,16 @@ void Tracking::GetMetricError(const std::vector<cv::Mat> &CamPose, const std::ve
     }
     else
     {
-        t_rpe_sum = t_rpe_sum/obj_count;
-        r_rpe_sum = r_rpe_sum/obj_count;
+        if (obj_count > 0) {
+            t_rpe_sum = t_rpe_sum/obj_count;
+            r_rpe_sum = r_rpe_sum/obj_count;
+        }
     }
-    cout << "average error (Over All Objects):" << " t: " << t_rpe_sum << " R: " << r_rpe_sum << endl;
+    if(obj_count > 0) {
+        cout << "average error (Over All Objects):" << " t: " << t_rpe_sum << " R: " << r_rpe_sum << endl;
+    } else {
+        cout << "No objects over which to calculate the error" << endl;
+    }
 
     // show each object
     for (int i = 0; i < each_obj_count.size(); ++i)
@@ -3458,7 +3504,6 @@ void Tracking::GetMetricError(const std::vector<cv::Mat> &CamPose, const std::ve
     }
 
     cout << "=================================================" << endl;
-
 }
 
 void Tracking::PlotMetricError(const std::vector<cv::Mat> &CamPose, const std::vector<std::vector<cv::Mat> > &RigMot, const std::vector<std::vector<cv::Mat> > &ObjPosePre,
