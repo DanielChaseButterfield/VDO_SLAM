@@ -509,7 +509,10 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, cv::Mat &imD, const cv::Ma
                     break;
             }
         }
-        cv::imshow("Static Background and Object Points", imRGB);
+
+        cv::Mat imRGB_Size2;
+        cv::resize(imRGB, imRGB_Size2, imRGB.size() * 2);
+        cv::imshow("Static Background and Object Points", imRGB_Size2);
         // cv::imwrite("feat.png",imRGB);
         if (f_id<4)
             cv::waitKey(1);
@@ -645,7 +648,7 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, cv::Mat &imD, const cv::Ma
         cv::rectangle(imTraj, cv::Point(x, y), cv::Point(x+5, y+5), cv::Scalar(0,255,0),1);
 
         // Show the Trajectories
-        imshow( "Camera and Object Trajectories", imTraj);
+        imshow("GT Trajectory (Red) vs. Estimated Trajectory (Green)", imTraj);
         cv::waitKey(1);
     }
 

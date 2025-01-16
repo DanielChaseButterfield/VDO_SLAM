@@ -86,7 +86,7 @@ def load_images_and_timestamps(bag_path, topic_name, num_images, starting_index)
 
     return timestamps, timestamps_num, images
 
-def extract_images_and_ts(bag_path, topic_name, path_name, calib_file, visualize_flow=False, visualize_disparity=True):
+def extract_images_and_ts(seq_path, bag_path, topic_name, path_name, calib_file, visualize_flow=False, visualize_disparity=True):
     print("============ Extracting Sequence: ", bag_path, " ============")
 
     # Set entries to save
@@ -94,7 +94,7 @@ def extract_images_and_ts(bag_path, topic_name, path_name, calib_file, visualize
     starting_index = 400
 
     # Set up a reader to read the rosbags and GT
-    path_to_dataset = Path(Path.cwd(), 'dataset_AirMuseum_Seq1', bag_path, bag_path[10:], 'original')
+    path_to_dataset = Path(Path.cwd(), seq_path, bag_path, bag_path[10:], 'original')
     path_to_bag_100 = Path(path_to_dataset, 'cam100_imu.bag')
     path_to_bag_101 = Path(path_to_dataset, 'cam101.bag')
     path_to_gt_pose_original = Path(path_to_dataset, "cam100_stamped_groundtruth.txt").absolute()
@@ -107,7 +107,7 @@ def extract_images_and_ts(bag_path, topic_name, path_name, calib_file, visualize
     path_to_times_file = Path(Path.cwd(), 'datasets', path_name, 'times.txt').absolute()
 
     # Load in calibration yaml files
-    path_to_calib = Path(Path.cwd(), 'dataset_AirMuseum_Seq1', 'sensors', calib_file)
+    path_to_calib = Path(Path.cwd(), seq_path, 'sensors', calib_file)
     yaml_file = None
     with open(str(path_to_calib)) as stream:
         yaml_file = yaml.safe_load(stream)
@@ -361,8 +361,8 @@ def main():
     test_cases()
 
     # NOTE: At least for robot A, cam100 is right eye, cam101 is left eye
-    extract_images_and_ts('scenario1_robotA', '/robotA', 'AirMuseum-Seq1-A', 'robotA_cameras_calib.yaml')
-    extract_images_and_ts('scenario1_robotB', '/robotB', 'AirMuseum-Seq1-B', 'robotB_cameras_calib.yaml')
+    extract_images_and_ts('dataset_AirMuseum_Seq1', 'scenario1_robotA', '/robotA', 'AirMuseum-Seq1-A', 'robotA_cameras_calib.yaml')
+    extract_images_and_ts('dataset_AirMuseum_Seq1', 'scenario1_robotB', '/robotB', 'AirMuseum-Seq1-B', 'robotB_cameras_calib.yaml')
 
     # Currently, disparity is calulated using mobilestereonet.
     # Also, Semantic Segmentation is done by CAT-SEG, but sadly it's NOT Instance Segementation, so this needs to be replaced.
