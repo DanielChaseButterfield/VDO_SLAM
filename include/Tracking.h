@@ -112,6 +112,9 @@ public:
 
     void UpdateMask();
 
+    // Run Final Optimization
+    void RunFullBatchOptimization();
+
 
 public:
 

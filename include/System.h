@@ -52,6 +52,15 @@ public:
 
     void SaveResults(const string &filename);
 
+    // Wrapper around Tracking::RunFullBatchOptimizatiion()
+    void RunFullBatchOptimization();
+
+    // Getter method for mpMap->vmCameraPose
+    std::vector<cv::Mat> GetVmCameraPose() { return mpMap->vmCameraPose; }
+
+    // Setter method for mpMap->vmCameraPose
+    void SetVmCameraPose_otherRobot() { mpMap->vmCameraPose_otherRobot; }
+
 private:
 
     // Input sensor

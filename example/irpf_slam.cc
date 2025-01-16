@@ -65,112 +65,6 @@ std::string getMatType(const cv::Mat& mat) {
     return r;
 }
 
-int main(int argc, char **argv)
-{
-    // Check that we have the right amount of input arguments
-    if(argc != 3)
-    {
-        cerr << endl << "Usage: ./irpf_slam path_to_settings path_to_sequence" << endl;
-        return 1;
-    }
-
-    // Retrieve paths to images
-    vector<string> vstrFilenamesRGB;
-    vector<string> vstrFilenamesDEP;
-    vector<string> vstrFilenamesSEM;
-    vector<string> vstrFilenamesFLO;
-    std::vector<cv::Mat> vPoseGT;
-    vector<double> vTimestamps;
-
-    LoadData(argv[2], vstrFilenamesSEM, vstrFilenamesRGB, vstrFilenamesDEP, vstrFilenamesFLO,
-                  vTimestamps, vPoseGT);
-
-    // Check consistency in the number of images, depth maps, segmentations and flow maps
-    int nImages = vstrFilenamesRGB.size()-1;
-    if(vstrFilenamesRGB.empty())
-    {
-        cerr << endl << "No images found in provided path." << endl;
-        return 1;
-    }
-    else if(vstrFilenamesDEP.size()!=vstrFilenamesRGB.size())
-    {
-        cerr << endl << "Different number of images for depth map." << endl;
-        return 1;
-    }
-    else if(vstrFilenamesSEM.size()!=vstrFilenamesRGB.size())
-    {
-        cerr << endl << "Different number of images for segmentation." << endl;
-        return 1;
-    }
-    else if(vstrFilenamesFLO.size()!=vstrFilenamesRGB.size())
-    {
-        cerr << endl << "Different number of images for flow map." << endl;
-        return 1;
-    }
-
-    // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    VDO_SLAM::System SLAM(argv[1],VDO_SLAM::System::RGBD);
-
-    cout << endl << "--------------------------------------------------------------------------" << endl;
-    cout << "Start processing sequence ..." << endl;
-    cout << "Images in the sequence: " << nImages << endl << endl;
-
-    // Create a imTraj matrix for directory display
-    cv::Mat imTraj(1000, 1000, CV_8UC3, cv::Scalar(255,255,255));
-
-    // Main loop of execution
-    cv::Mat imRGB, imD, mTcw_gt;
-    for(int ni=0; ni<nImages; ni++)
-    {
-        cout << endl;
-        cout << "=======================================================" << endl;
-        cout << "Processing Frame: " << ni << endl;
-
-        // Read imreadmage and depthmap from file
-        imRGB = cv::imread(vstrFilenamesRGB[ni],CV_LOAD_IMAGE_UNCHANGED);
-        imD   = cv::imread(vstrFilenamesDEP[ni],CV_LOAD_IMAGE_UNCHANGED);
-        cv::Mat imD_f, imD_r;
-
-        // Output the type of Disparity Data for debugging
-        if (ni == 0){
-            cout << "Type of Disparity Image Data: " << getMatType(imD) << endl;
-        }
-
-        // For stereo disparity input
-        imD.convertTo(imD_f, CV_32F);
-
-        // Load flow matrix
-        cv::Mat imFlow = cv::optflow::readOpticalFlow(vstrFilenamesFLO[ni]);
-
-        // Load semantic mask
-        cv::Mat imSem(imRGB.rows, imRGB.cols, CV_32SC1);
-        LoadMask(vstrFilenamesSEM[ni],imSem);
-
-        double tframe = vTimestamps[ni];
-        mTcw_gt = vPoseGT[ni];
-
-        // Object poses in current frame
-        vector<vector<float> > vObjPose_gt(0);
-
-        if(imRGB.empty())
-        {
-            cerr << endl << "Failed to load image at: " << vstrFilenamesRGB[ni] << endl;
-            return 1;
-        }
-
-        // Pass the image to the SLAM system
-        SLAM.TrackRGBD(imRGB,imD_f,imFlow,imSem,mTcw_gt,vObjPose_gt,tframe,imTraj,nImages);
-
-        // Wait a little bit for plot visualization
-        //sleep_for(nanoseconds(100000000));
-    }
-
-    // Save camera trajectory
-    //SLAM.SaveResults("/root/VDO_SLAM/Evaluation/");
-
-    return 0;
-}
-
 /**
  * This function loads data from a dataset sequence, and also gets filenames for it.
  * 
@@ -455,9 +349,124 @@ void LoadMask(const string &strFilenamesMask, cv::Mat &imMask)
     cv::waitKey(1);
     return;
 }
+/*
+ * Create a SLAM System, run all of the steps of processing, but 
+ * stop right before the final Global Batch Optimization.
+ * 
+ * Parameters:
+ *     strSettingsFile - String with the path to the .yaml file
+ *         with the robot and system settings.
+ *     strPathToSequence - String with the path to the directory
+ *         containing the robot sequence (with disparity_L, flow_L,
+ *         image_L, and semantic_L folders; as well as pose_gt.txt
+ *         and times.txt)
+ *
+ * Returns:
+ *     VDO_SLAM::System robot - The SLAM system representing a
+ *         robot, where all processing except final GBO has been
+ *         performed.
+ */
+VDO_SLAM::System CreateRobotAndRunSLAM(const string &strSettingsFile, const string &strPathToSequence) {
 
+    // Create SLAM system. It initializes all system threads and gets ready to process frames.
+    VDO_SLAM::System SLAM(strSettingsFile,VDO_SLAM::System::RGBD);
 
+    // Retrieve paths to images
+    vector<string> vstrFilenamesRGB;
+    vector<string> vstrFilenamesDEP;
+    vector<string> vstrFilenamesSEM;
+    vector<string> vstrFilenamesFLO;
+    std::vector<cv::Mat> vPoseGT;
+    vector<double> vTimestamps;
+    LoadData(strPathToSequence, vstrFilenamesSEM, vstrFilenamesRGB, vstrFilenamesDEP, vstrFilenamesFLO,
+                  vTimestamps, vPoseGT);
 
+    // Check consistency in the number of images, depth maps, segmentations and flow maps
+    int nImages = vstrFilenamesRGB.size()-1;
+    if(vstrFilenamesRGB.empty())
+    {
+        throw std::invalid_argument("No images found in provided path.");
+    }
+    else if(vstrFilenamesDEP.size()!=vstrFilenamesRGB.size())
+    {
+        throw std::invalid_argument("Different number of images for depth map.");
+    }
+    else if(vstrFilenamesSEM.size()!=vstrFilenamesRGB.size())
+    {
+        throw std::invalid_argument("Different number of images for segmentation.");
+    }
+    else if(vstrFilenamesFLO.size()!=vstrFilenamesRGB.size())
+    {
+        throw std::invalid_argument("Different number of images for flow map.");
+    }
 
+    cout << endl << "--------------------------------------------------------------------------" << endl;
+    cout << "Start processing sequence ..." << endl;
+    cout << "Images in the sequence: " << nImages << endl << endl;
 
+    // Create a imTraj matrix for directory display
+    cv::Mat imTraj(1000, 1000, CV_8UC3, cv::Scalar(255,255,255));
 
+    // Main loop of execution
+    cv::Mat imRGB, imD, mTcw_gt;
+    for(int ni=0; ni<nImages; ni++)
+    {
+        cout << endl;
+        cout << "=======================================================" << endl;
+        cout << "Processing Frame: " << ni << endl;
+
+        // Read imreadmage and depthmap from file
+        imRGB = cv::imread(vstrFilenamesRGB[ni],CV_LOAD_IMAGE_UNCHANGED);
+        imD   = cv::imread(vstrFilenamesDEP[ni],CV_LOAD_IMAGE_UNCHANGED);
+        cv::Mat imD_f, imD_r;
+
+        // Output the type of Disparity Data for debugging
+        if (ni == 0){
+            cout << "Type of Disparity Image Data: " << getMatType(imD) << endl;
+        }
+
+        // For stereo disparity input
+        imD.convertTo(imD_f, CV_32F);
+
+        // Load flow matrix
+        cv::Mat imFlow = cv::optflow::readOpticalFlow(vstrFilenamesFLO[ni]);
+
+        // Load semantic mask
+        cv::Mat imSem(imRGB.rows, imRGB.cols, CV_32SC1);
+        LoadMask(vstrFilenamesSEM[ni],imSem);
+
+        double tframe = vTimestamps[ni];
+        mTcw_gt = vPoseGT[ni];
+
+        // Object poses in current frame
+        vector<vector<float> > vObjPose_gt(0);
+
+        if(imRGB.empty())
+        {
+            cerr << endl << "Failed to load image at: " << vstrFilenamesRGB[ni] << endl;
+            return 1;
+        }
+
+        // Pass the image to the SLAM system
+        SLAM.TrackRGBD(imRGB,imD_f,imFlow,imSem,mTcw_gt,vObjPose_gt,tframe,imTraj,nImages);
+
+    }
+}
+
+int main(int argc, char **argv)
+{
+    // Check that we have the right amount of input arguments
+    if(argc != 3)
+    {
+        cerr << endl << "Usage: ./irpf_slam path_to_settings path_to_sequence" << endl;
+        return 1;
+    }
+
+    // Run the final optimization
+    SLAM.RunFullBatchOptimization();
+
+    // Save camera trajectory
+    //SLAM.SaveResults("/root/VDO_SLAM/Evaluation/");
+
+    return 0;
+}

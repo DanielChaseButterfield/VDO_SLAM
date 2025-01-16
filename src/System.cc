@@ -243,6 +243,12 @@ void System::SaveResults(const string &filename)
 
 }
 
-
+/*
+ * Wrapper for Tracking::RunFullBatchOptimization()
+ * as mpTracker is private.
+ */
+void System::RunFullBatchOptimization() {
+    mpTracker->RunFullBatchOptimization();
+}
 
 } //namespace VDO_SLAM

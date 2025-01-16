@@ -89,7 +89,11 @@ public:
 
 
     // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    // Measurements recieved from other robots through inter-robot communication
     // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    // Same as vmCameraPose, but for other robot
+    std::vector<cv::Mat> vmCameraPose_otherRobot;
 
 protected:
 

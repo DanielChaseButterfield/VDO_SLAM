@@ -1248,62 +1248,59 @@ void Tracking::Track()
         // cout << "local optimization time: " << loc_ba_time << endl;
     }
 
-    // =================================================================================================
-    // ============== Full batch optimize on all the measurements (global optimization) ================
-    // =================================================================================================
-
-    bGlobalBatch = true;
-    if (f_id==StopFrame) // bFrame2Frame f_id>=2
-    {
-        // Metric Error BEFORE Optimization
-        GetMetricError(mpMap->vmCameraPose,mpMap->vmRigidMotion, mpMap->vmObjPosePre,
-                       mpMap->vmCameraPose_GT,mpMap->vmRigidMotion_GT, mpMap->vbObjStat);
-        // GetVelocityError(mpMap->vmRigidMotion, mpMap->vp3DPointDyn, mpMap->vnFeatLabel,
-        //                  mpMap->vnRMLabel, mpMap->vfAllSpeed_GT, mpMap->vnAssoDyn, mpMap->vbObjStat);
-
-        if (bGlobalBatch && (mTestData==KITTI || mTestData==AirMuseum))
-        {
-            // Get Full Batch Optimization
-            Optimizer::FullBatchOptimization(mpMap,mK);
-
-            // Metric Error AFTER Optimization
-            GetMetricError(mpMap->vmCameraPose_RF,mpMap->vmRigidMotion_RF, mpMap->vmObjPosePre,
-                           mpMap->vmCameraPose_GT,mpMap->vmRigidMotion_GT, mpMap->vbObjStat);
-            // GetVelocityError(mpMap->vmRigidMotion_RF, mpMap->vp3DPointDyn, mpMap->vnFeatLabel,
-            //                  mpMap->vnRMLabel, mpMap->vfAllSpeed_GT, mpMap->vnAssoDyn, mpMap->vbObjStat);
-
-            // Make a new plot just for the final optimized result
-            if (mTestData==AirMuseum)
-            {
-                // Set the parameters for the cv display
-                int sta_x = 300, sta_y = 100, radi = 1, thic = 2;  // (160/120/2/5)
-                float scale = 100;
-                cv::Mat imTrajFinal(1000, 1000, CV_8UC3, cv::Scalar(255,255,255));
-
-                for(int i = 0; i < mpMap->vmCameraPose_GT.size(); i++) {
-                    // Get the Pose
-                    cv::Mat CamPos = mpMap->vmCameraPose_GT[i];
-                
-                    // Draw a red square for the GT Pose
-                    int x = int(CamPos.at<float>(0,3)*scale) + sta_x;
-                    int y = int(CamPos.at<float>(2,3)*scale) + sta_y;
-                    cv::rectangle(imTrajFinal, cv::Point(x, y), cv::Point(x+5, y+5), cv::Scalar(0,0,255),1);
-
-                    // Get the estimated Camera Pose, draw a green square
-                    CamPos = mpMap->vmCameraPose_RF[i];
-                    x = int(CamPos.at<float>(0,3)*scale) + sta_x;
-                    y = int(CamPos.at<float>(2,3)*scale) + sta_y;
-                    cv::rectangle(imTrajFinal, cv::Point(x, y), cv::Point(x+5, y+5), cv::Scalar(0,255,0),1);
-                }
-
-                // Show the Trajectories
-                imshow( "(Optimized) Camera and Object Trajectories", imTrajFinal);
-                cv::waitKey(0);
-            }
-        }
-    }
-
     mState = OK;
+}
+
+/*
+ * This function is mainly a wrapper around
+ * Optimizer::FullBatchOptimization(), which
+ * allows it to be run easily from an outside
+ * script without needed to pass arguments. 
+ * 
+ * Additionally, computes error after refinement
+ * and may plot final optimized result.
+ */
+void Tracking::RunFullBatchOptimization() {
+
+    cout << endl << "-------------------------------------------" << endl;
+    cout << "! ! ! !  Full Batch Optimization   ! ! ! ! " << endl;
+    cout << "-------------------------------------------" << endl;
+
+    // Get Full Batch Optimization
+    Optimizer::FullBatchOptimization(mpMap,mK);
+
+    // Metric Error AFTER Optimization
+    GetMetricError(mpMap->vmCameraPose_RF,mpMap->vmRigidMotion_RF, mpMap->vmObjPosePre,
+                    mpMap->vmCameraPose_GT,mpMap->vmRigidMotion_GT, mpMap->vbObjStat);
+
+    // Make a new plot just for the final optimized result
+    if (mTestData==AirMuseum)
+    {
+        // Set the parameters for the cv display
+        int sta_x = 300, sta_y = 100, radi = 1, thic = 2;
+        float scale = 100;
+        cv::Mat imTrajFinal(1000, 1000, CV_8UC3, cv::Scalar(255,255,255));
+
+        for(int i = 0; i < mpMap->vmCameraPose_GT.size(); i++) {
+            // Get the Pose
+            cv::Mat CamPos = mpMap->vmCameraPose_GT[i];
+        
+            // Draw a red square for the GT Pose
+            int x = int(CamPos.at<float>(0,3)*scale) + sta_x;
+            int y = int(CamPos.at<float>(2,3)*scale) + sta_y;
+            cv::rectangle(imTrajFinal, cv::Point(x, y), cv::Point(x+5, y+5), cv::Scalar(0,0,255),1);
+
+            // Get the estimated Camera Pose, draw a green square
+            CamPos = mpMap->vmCameraPose_RF[i];
+            x = int(CamPos.at<float>(0,3)*scale) + sta_x;
+            y = int(CamPos.at<float>(2,3)*scale) + sta_y;
+            cv::rectangle(imTrajFinal, cv::Point(x, y), cv::Point(x+5, y+5), cv::Scalar(0,255,0),1);
+        }
+
+        // Show the Trajectories
+        imshow( "(Optimized) Camera and Object Trajectories", imTrajFinal);
+        cv::waitKey(0);
+    }
 }
 
 
